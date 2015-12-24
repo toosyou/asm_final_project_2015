@@ -31,18 +31,31 @@ c_updatePositionsOfAllObjects PROTO C
 
 .data 
 
-MY_INFO_AT_TOP_BAR	BYTE "My Student Name: NCTU: StudentID: 0123456789",0 
+MY_INFO_AT_TOP_BAR	BYTE "My Student Name:YI-CHUN CHANG NCTU:cs StudentID: 0316313",0 
 
-MyMsg BYTE "Project Title: Assembly Programming...",0dh, 0ah, 0
+MyMsg BYTE "Student Name: YI-CHUN CHANG",0dh, 0ah
+		BYTE "My Student ID is 0316313",0dh,0ah
+		BYTE "My Email is: ycc.cs03@nctu.edu.tw.",0dh,0ah,0
 
-CaptionString BYTE "Student Name: Huang",0
+CaptionString BYTE "Student Name: YI-CHUN CHANG",0
 MessageString BYTE "Welcome to Wonderful World", 0dh, 0ah, 0dh, 0ah
-				BYTE "My Student ID is 0123456789", 0dh, 0ah, 0dh, 0ah
-				BYTE "My Email is: xyz@nctu.edu.tw.", 0dh, 0ah, 0dh, 0ah, 0
+				BYTE "My Student ID is 0316313", 0dh, 0ah, 0dh, 0ah
+				BYTE "My Email is: ycc.cs03@nctu.edu.tw.", 0dh, 0ah, 0dh, 0ah
+				BYTE "i - toggle to show or hide the student ID", 0dh, 0ah, 0dh, 0ah
+				BYTE "Manipulate student ID", 0dh, 0ah, 0dh, 0ah
+				BYTE 9,"a-left d-right w-up s-down", 0dh, 0ah, 0dh, 0ah
+				BYTE "a - change the current current image to a gray level image", 0dh, 0ah, 0dh, 0ah
+				BYTE "m - exchange the red component and the green component ", 0dh, 0ah, 0dh, 0ah
+				BYTE 9,"of each pixel of the background image", 0dh, 0ah, 0dh, 0ah
+				BYTE "r - restore the current image back to its initial state", 0dh, 0ah, 0dh, 0ah
+				BYTE "p - toggle the game mode state. If in game mode, show the grid.", 0dh, 0ah, 0dh, 0ah
+				BYTE "o - in game mode. Randomly shuffle the subimages of the grid cells.", 0dh, 0ah, 0dh, 0ah
+				BYTE "mouse - exchange two rows", 0dh, 0ah, 0dh, 0ah
+				BYTE "esc - quit the program", 0dh, 0ah, 0dh, 0ah, 0
 
-CaptionString_EndingMessage BYTE "Student Name: Huang",0
-MessageString_EndingMessage BYTE "My Student ID is 0123456789", 0dh, 0ah, 0dh, 0ah
-							BYTE "My Email is: xyz@nctu.edu.tw.", 0dh, 0ah, 0dh, 0ah, 0
+CaptionString_EndingMessage BYTE "Student Name: YI-CHUN CHANG",0
+MessageString_EndingMessage BYTE "My Student ID is 0316313", 0dh, 0ah, 0dh, 0ah
+							BYTE "My Email is: ycc.cs03@nctu.edu.tw.", 0dh, 0ah, 0dh, 0ah, 0
 							
 windowWidth		DWORD 8000
 windowHeight	DWORD 8000
@@ -107,6 +120,27 @@ mImagePixelPointSize DWORD 6
 
 .code
 
+cal_index PROC USES ebx,
+	index_image : DWORD, x : DWORD, y : DWORD
+	cld
+	mov ebx, mImageHeight
+	sub ebx, y
+	imul ebx, mImageWidth
+	add ebx, x
+	imul ebx, mBytesPerPixel
+
+	.if index_image == 0
+		mov eax, offset mImagePtr0
+	.elseif index_image == 1
+		mov eax, offset mImagePtr1
+	.elseif index_image == 2
+		mov eax, offset mImagePtr2
+	.endif
+
+	add eax, ebx
+	ret
+cal_index ENDP
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;void asm_ClearScreen()
 ;
@@ -135,7 +169,7 @@ asm_ShowTitle PROC C USES edx
 	mov al, 0e1h
 	call SetTextColor
 	mov edx, offset MyMsg
-	call WriteString
+	invoke SetConsoleTitle, edx
 	ret
 asm_ShowTitle ENDP
 
@@ -282,16 +316,16 @@ asm_HandleKey PROC C,
 	key : DWORD
 	mov eax, key
 	call WriteInt
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	cmp eax, MOVE_LEFT_KEY
 	jne L1
 	call moveLeft
 	jmp exit0
-L1:
-L4:
-exit0:
-	mov eax, 0
-	ret
+	L1:
+	L4:
+	exit0:
+		mov eax, 0
+		ret
 asm_HandleKey ENDP
 
 moveLeft PROC
@@ -357,9 +391,9 @@ asm_SetWindowDimension ENDP
 ;Return the number of objects
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 asm_GetNumOfObjects PROC C
-	mov eax, 1
+	mov eax, 1024
 	ret
-asm_GetNumOfObjects ENDP	
+asm_GetNumOfObjects ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;int asm_GetObjectType(int objID)
@@ -450,45 +484,75 @@ asm_ComputeObjPositionY ENDP
 ; Purpose of this procedure:
 ; Copy the image to our own database
 ;
-asm_SetImage PROC C USES esi edi ebx,
-imageIndex : DWORD,
-imagePtr : PTR BYTE, w : DWORD, h : DWORD, bytesPerPixel : DWORD
+asm_SetImage PROC C USES esi edi ebx ecx,
+	imageIndex : DWORD,imagePtr : PTR BYTE,
+	w : DWORD, h : DWORD, bytesPerPixel : DWORD
+
 	mov mImageStatus, 1
-	mov mImageWidth, 16
-	mov mImageHeight, 16
-	mov mBytesPerPixel, 1
+	mov ebx, w
+	mov mImageWidth, ebx
+	mov ebx, h
+	mov mImageHeight, ebx
+	mov ebx, bytesPerPixel
+	mov mBytesPerPixel, ebx
+
+	mov esi, imagePtr
+	.if imageIndex == 0
+		mov edi, offset mImagePtr0
+	.elseif imageIndex == 1
+		mov edi, offset mImagePtr1
+	.elseif imageIndex == 2
+		mov edi, offset mImagePtr2
+	.endif
+
+	;calculate the number of bytes needed to copy
+	cld
+	mov ecx, w
+	imul ecx, h
+	imul ecx, bytesPerPixel
+
+	;copy from image_ptr to m_image_ptr[i]
+	rep movsb
 	ret
 asm_SetImage ENDP
 
 asm_GetImagePixelSize PROC C
-mov eax, mImagePixelPointSize
-ret
+	mov eax, mImagePixelPointSize
+	ret
 asm_GetImagePixelSize ENDP
 
 asm_GetImageStatus PROC C
-mov eax, 1
-ret
+	mov eax, 1
+	ret
 asm_GetImageStatus ENDP
 
 asm_getImagePercentage PROC C
-mov eax, imagePercentage
-ret
+	mov eax, imagePercentage
+	ret
 asm_getImagePercentage ENDP
 
 ;
 ;asm_GetImageColour(int imageIndex, int ix, int iy, int &r, int &g, int &b)
 ;
-asm_GetImageColour PROC C USES ebx esi, 
-imageIndex : DWORD,
-ix: DWORD, iy : DWORD,
-r: PTR DWORD, g: PTR DWORD, b: PTR DWORD
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+asm_GetImageColour PROC C USES ebx esi eax, 
+	imageIndex : DWORD,
+	ix: DWORD, iy : DWORD,
+	r: PTR DWORD, g: PTR DWORD, b: PTR DWORD
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	invoke cal_index, imageIndex, ix, iy
 	mov esi, r
-	mov DWORD PTR [esi], 0
+	movzx ebx, BYTE PTR[eax]
+	mov DWORD PTR [esi], ebx
+
 	mov esi, g
-	mov DWORD PTR [esi], 125
+	movzx ebx, BYTE PTR[eax + 1]
+	mov DWORD PTR [esi], ebx
+
 	mov esi, b
-	mov DWORD PTR [esi], 0
+	movzx ebx, BYTE PTR[eax + 2]
+	mov DWORD PTR [esi], ebx
+
 	ret
 asm_GetImageColour ENDP
 
@@ -513,12 +577,15 @@ asm_GetParticleSystemState ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;void asm_GetImageDimension(int &iw, int &ih)
-asm_GetImageDimension PROC C USES ebx,
-iw : PTR DWORD, ih : PTR DWORD
+asm_GetImageDimension PROC C USES ebx edx,
+	iw : PTR DWORD, ih : PTR DWORD
 	mov ebx, iw
-	mov DWORD PTR [ebx], 8
+	mov edx, mImageWidth
+	mov DWORD PTR [ebx], edx
+
 	mov ebx, ih
-	mov DWORD PTR [ebx], 8
+	mov edx, mImageHeight
+	mov DWORD PTR [ebx], edx
 	ret
 asm_GetImageDimension ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -537,7 +604,7 @@ asm_GetImagePos PROC C USES ebx,
 	idiv ebx
 	mov ebx, x
 	mov [ebx], eax
-;
+
 	mov eax, canvasMinY
 	mov ebx, scaleFactor
 	cdq
@@ -572,8 +639,8 @@ updateGame PROC USES esi
 	mov esi, offset objPosX
 	mov eax, 20
 	sub SDWORD PTR [esi], eax
-Lexit0:
-	ret
+	Lexit0:
+		ret
 updateGame ENDP
 
 END
